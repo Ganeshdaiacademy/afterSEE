@@ -3282,39 +3282,22 @@ const CertificateDownloadSection = () => (
     // =================================================================================
     // ===== PAGE SECTIONS =====
     // =================================================================================
-   const HomeDashboard = ({ setActiveSection, userName, completedQuizzes, userStats, isPremium, activityLog, checkAndUnlockAchievement }) => {
+const HomeDashboard = ({ setActiveSection, userName, completedQuizzes, userStats, isPremium, activityLog, checkAndUnlockAchievement }) => {
     const completedCount = Object.keys(completedQuizzes).length;
     const nextQuiz = DATA.dailyQuizzes.find(q => !completedQuizzes[q.day]);
     const xpInLevel = userStats.xp % DATA.XP_PER_LEVEL;
     const xpProgressPercentage = (xpInLevel / DATA.XP_PER_LEVEL) * 100;
-
-    // Streak determines how many PDFs are unlocked (original logic)
-    const loginStreak = userStats.streak || 1;
-    // For free users, max unlocked day is limited to 12, regardless of streak
-    const maxUnlockedDay = isPremium 
-        ? Math.min(loginStreak, DATA.dailyPracticePDFs.length) 
-        : Math.min(loginStreak, 12, DATA.dailyPracticePDFs.length);
     
-    // Track viewed PDFs (original)
+    // Get user's login streak to determine unlocked PDFs
+    const loginStreak = userStats.streak || 1;
+    const maxUnlockedDay = Math.min(loginStreak, DATA.dailyPracticePDFs.length);
+    
+    // Track viewed PDFs
     const [viewedPDFs, setViewedPDFs] = React.useState(() => {
         const saved = localStorage.getItem('viewedPDFs');
         return saved ? JSON.parse(saved) : {};
     });
     const [selectedPDF, setSelectedPDF] = React.useState(null);
-    
-    // Track the last opened PDF date (for one-per-day rule)
-    const [lastOpenDate, setLastOpenDate] = React.useState(() => {
-        return localStorage.getItem('lastPDFOpenDate') || '';
-    });
-    const [todayOpenedCount, setTodayOpenedCount] = React.useState(() => {
-        const today = new Date().toDateString();
-        const savedDate = localStorage.getItem('lastPDFOpenDate');
-        const savedCount = localStorage.getItem('todayPDFOpened');
-        return (savedDate === today) ? (parseInt(savedCount) || 0) : 0;
-    });
-    
-    const [showLimitTooltip, setShowLimitTooltip] = React.useState(false);
-    const [tooltipMessage, setTooltipMessage] = React.useState('');
     
     const getGreeting = () => { 
         const hour = new Date().getHours(); 
@@ -3323,12 +3306,7 @@ const CertificateDownloadSection = () => (
         return "Good evening"; 
     };
     
-    const showTemporaryTooltip = (message) => {
-        setTooltipMessage(message);
-        setShowLimitTooltip(true);
-        setTimeout(() => setShowLimitTooltip(false), 2500);
-    };
-    
+    // Mark PDF as viewed
     const markAsViewed = (day) => {
         if (!viewedPDFs[day]) {
             const newViewed = { ...viewedPDFs, [day]: true };
@@ -3337,41 +3315,6 @@ const CertificateDownloadSection = () => (
         }
     };
     
-    const handleOpenPDF = (pdf) => {
-        // Check if the PDF is unlocked by streak & free/premium limit
-        if (pdf.day > maxUnlockedDay) {
-            showTemporaryTooltip(isPremium ? "🔒 You need a longer streak to unlock this PDF." : "🔒 Free users can only access Days 1–12. Upgrade to Premium for full access!");
-            return;
-        }
-        
-        // Check one-per-day rule
-        const today = new Date().toDateString();
-        let currentCount = todayOpenedCount;
-        if (lastOpenDate !== today) {
-            currentCount = 0;
-            setTodayOpenedCount(0);
-            setLastOpenDate(today);
-            localStorage.setItem('lastPDFOpenDate', today);
-            localStorage.setItem('todayPDFOpened', '0');
-        }
-        
-        if (currentCount >= 1) {
-            showTemporaryTooltip("📅 You've already opened a PDF today. Come back tomorrow for another!");
-            return;
-        }
-        
-        // Allowed – open the PDF
-        setSelectedPDF(pdf);
-        markAsViewed(pdf.day);
-        
-        // Update the daily counter
-        const newCount = currentCount + 1;
-        setTodayOpenedCount(newCount);
-        localStorage.setItem('todayPDFOpened', newCount.toString());
-        localStorage.setItem('lastPDFOpenDate', today);
-    };
-    
-    // Circular progress component (refined)
     const CircularProgress = ({ percentage, size = 120 }) => {
         const strokeWidth = 10;
         const radius = (size - strokeWidth) / 2;
@@ -3394,18 +3337,15 @@ const CertificateDownloadSection = () => (
     let nextStepButton;
     if (nextQuiz) {
         if (!isPremium && nextQuiz.isPremium) {
-            nextStepButton = <button onClick={() => setActiveSection('resources')} className="gradient-button text-white font-bold py-3 px-8 rounded-full shadow-xl text-lg transition-transform hover:scale-105"> Unlock Premium Quiz <i className="fas fa-star ml-2"></i> </button>;
+            nextStepButton = <button onClick={() => setActiveSection('resources')} className="gradient-button text-white font-bold py-3 px-8 rounded-full shadow-xl text-lg"> Unlock Premium Quiz <i className="fas fa-star ml-2"></i> </button>;
         } else {
-            nextStepButton = <button onClick={() => setActiveSection('quizzes')} className="gradient-button text-white font-bold py-3 px-8 rounded-full shadow-xl text-lg transition-transform hover:scale-105"> Go to Quizzes <i className="fas fa-arrow-right ml-2"></i> </button>;
+            nextStepButton = <button onClick={() => setActiveSection('quizzes')} className="gradient-button text-white font-bold py-3 px-8 rounded-full shadow-xl text-lg"> Go to Quizzes <i className="fas fa-arrow-right ml-2"></i> </button>;
         }
     }
 
-    const today = new Date().toDateString();
-    const canOpenToday = (lastOpenDate !== today) || (todayOpenedCount < 1);
-    
     return (
-        <section id="home" className="relative">
-            {/* PDF Viewer Modal */}
+        <section id="home">
+            {/* Use the existing PdfViewerModal component */}
             {selectedPDF && (
                 <PdfViewerModal 
                     pdfInfo={selectedPDF} 
@@ -3414,139 +3354,75 @@ const CertificateDownloadSection = () => (
                 />
             )}
             
-            {/* Hero Section */}
             <div className="relative bg-gradient-to-br from-indigo-800 via-purple-800 to-blue-900 text-white overflow-hidden animate-gradient">
-                <div className="absolute inset-0 bg-black/20"></div>
-                <div className="container mx-auto px-4 py-20 md:py-28 relative z-10 text-center">
-                    <div className="inline-block px-4 py-1 rounded-full bg-white/20 backdrop-blur-sm text-sm font-semibold mb-4 animate-fadeIn">
-                        <i className="fas fa-calendar-alt mr-2"></i> {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                <div className="container mx-auto px-4 py-16 md:py-24 relative z-10">
+                    <div className="text-center">
+                        <h1 className="text-4xl md:text-5xl font-black leading-tight tracking-tight animate-fadeIn">{getGreeting()}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-purple-300">{userName}!</span></h1>
+                        <p className="mt-4 text-lg text-gray-200 max-w-xl mx-auto animate-fadeIn" style={{ animationDelay: '200ms' }}>Your journey to success continues here. Let's make today productive.</p>
                     </div>
-                    <h1 className="text-5xl md:text-6xl font-black leading-tight tracking-tight animate-fadeIn">
-                        {getGreeting()}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-pink-300">{userName}!</span>
-                    </h1>
-                    <p className="mt-4 text-xl text-gray-200 max-w-xl mx-auto animate-fadeIn" style={{ animationDelay: '150ms' }}>
-                        Your journey to success continues here. Let's make today productive.
-                    </p>
-                    {isPremium && (
-                        <div className="mt-4 inline-flex items-center gap-2 bg-amber-500/20 backdrop-blur-sm px-4 py-2 rounded-full text-amber-200 border border-amber-400/50 animate-pulse">
-                            <i className="fas fa-crown"></i>
-                            <span className="font-semibold">PREMIUM MEMBER</span>
-                        </div>
-                    )}
                 </div>
-                <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-gray-50 dark:from-slate-900 to-transparent"></div>
             </div>
             
             <div className="container mx-auto px-4 -mt-12 relative z-20">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Main Content */}
-                    <div className="lg:col-span-2 space-y-8">
-                        {/* Next Step Card */}
-                        <div className="bg-white dark:bg-slate-900/90 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 transition-all duration-300 hover:shadow-2xl hover:-translate-y-1">
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="w-12 h-12 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center">
-                                    <i className="fas fa-arrow-right text-indigo-600 dark:text-indigo-400 text-xl"></i>
-                                </div>
-                                <h2 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Your Next Step</h2>
-                            </div>
-                            {nextQuiz ? (
-                                <div>
-                                    <p className="text-gray-600 dark:text-gray-300 mb-2">Up next is the quiz for Day {nextQuiz.day}:</p>
-                                    <h3 className="text-3xl font-extrabold text-gray-800 dark:text-white mb-3">{nextQuiz.title}</h3>
-                                    <div className="flex items-center gap-3 mb-6">
-                                        <span className="px-3 py-1 bg-gray-100 dark:bg-slate-800 rounded-full text-sm text-gray-600 dark:text-gray-400">
-                                            <i className="fas fa-book-open mr-1"></i> Subject: {nextQuiz.subject}
-                                        </span>
-                                        {nextQuiz.isPremium && !isPremium && (
-                                            <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full text-sm">
-                                                <i className="fas fa-star mr-1"></i> Premium
-                                            </span>
-                                        )}
-                                    </div>
-                                    {nextStepButton}
-                                </div>
-                            ) : (
-                                <div className="text-center py-6">
-                                    <div className="text-7xl animate-tada inline-block mb-4">🎉</div>
-                                    <h3 className="text-3xl font-extrabold text-green-500">All Quizzes Completed!</h3>
-                                    <p className="text-gray-600 dark:text-gray-400 mt-2">Incredible work! Check your achievements or join a competition.</p>
-                                </div>
-                            )}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl animate-slideInUp card-hover">
+                            <h2 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-4">Your Next Step</h2>
+                            {nextQuiz ? (<div><p className="text-lg mb-2">Up next is the quiz for Day {nextQuiz.day}:</p><h3 className="text-3xl font-extrabold mb-4">{nextQuiz.title}</h3><p className="text-gray-500 dark:text-gray-400 mb-6">Subject: {nextQuiz.subject}</p>{nextStepButton}</div>) : (<div className="text-center py-8"><span className="text-7xl animate-tada inline-block">🎉</span><h3 className="text-3xl font-extrabold mt-4 text-green-500">All Quizzes Completed!</h3><p className="text-lg mt-2">Incredible work! Check your achievements or join a competition.</p></div>)}
                         </div>
                         
-                        {/* Daily Practice PDF Section */}
-                        <div className="bg-white dark:bg-slate-900/90 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 transition-all duration-300 hover:shadow-2xl">
-                            <div className="flex flex-wrap justify-between items-center mb-4 gap-3">
+                        {/* Daily Practice PDF Section - Unlocks based on login streak */}
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl animate-slideInUp card-hover">
+                            <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+                                <h2 className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                    <i className="fas fa-calendar-day mr-2 text-orange-500"></i>
+                                    Daily Practice PDFs
+                                </h2>
                                 <div className="flex items-center gap-2">
-                                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
-                                        <i className="fas fa-file-pdf text-blue-600 dark:text-blue-400"></i>
-                                    </div>
-                                    <h2 className="text-2xl font-bold text-blue-600 dark:text-blue-400">Daily Practice PDFs</h2>
-                                </div>
-                                <div className="flex gap-2">
                                     <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-3 py-1 rounded-full">
                                         <i className="fas fa-fire mr-1"></i>Streak: {loginStreak} days
                                     </span>
-                                    <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-3 py-1 rounded-full">
+                                    <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-3 py-1 rounded-full">
                                         <i className="fas fa-unlock-alt mr-1"></i>Unlocked: {maxUnlockedDay}/{DATA.dailyPracticePDFs.length}
                                     </span>
                                 </div>
                             </div>
                             
-                            {/* One-per-day info */}
-                            <div className="mb-5 flex items-center justify-between bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-900/20 dark:to-blue-900/20 p-3 rounded-xl border border-indigo-200 dark:border-indigo-800">
-                                <div className="flex items-center gap-2">
-                                    <i className={`fas ${canOpenToday ? 'fa-check-circle text-green-500' : 'fa-clock text-amber-500'} text-lg`}></i>
-                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {canOpenToday ? "You can open 1 PDF today" : "You've used your 1 PDF for today. Come back tomorrow!"}
-                                    </span>
-                                </div>
-                                {!isPremium && maxUnlockedDay >= 12 && maxUnlockedDay < DATA.dailyPracticePDFs.length && (
-                                    <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full">
-                                        <i className="fas fa-gem mr-1"></i>Upgrade to unlock more
-                                    </span>
-                                )}
-                            </div>
+                            <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">
+                                <i className="fas fa-info-circle mr-1"></i>
+                                New PDF unlocks every day you log in! Day {loginStreak + 1} unlocks tomorrow.
+                            </p>
                             
-                            {/* PDF Grid */}
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-[450px] overflow-y-auto p-1 custom-scrollbar">
-                                {DATA.dailyPracticePDFs.map((pdf) => {
-                                    const isUnlockedByStreak = pdf.day <= maxUnlockedDay;
-                                    const isFreeUserLimited = !isPremium && pdf.day > 12;
-                                    const isActuallyUnlocked = isUnlockedByStreak && !isFreeUserLimited;
+                            {/* PDF Grid - Shows all but locks unearned ones */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[400px] overflow-y-auto p-1">
+                                {DATA.dailyPracticePDFs.map((pdf, index) => {
+                                    const isUnlocked = pdf.day <= maxUnlockedDay;
                                     const isViewed = viewedPDFs[pdf.day];
                                     
                                     return (
                                         <button
                                             key={pdf.day}
-                                            onClick={() => handleOpenPDF(pdf)}
-                                            disabled={!isActuallyUnlocked}
-                                            className={`group relative flex flex-col items-center p-4 rounded-xl transition-all duration-300 transform hover:scale-105 ${
-                                                isActuallyUnlocked 
-                                                    ? 'bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-800 dark:to-slate-800/80 hover:shadow-lg cursor-pointer border border-gray-200 dark:border-slate-700' 
-                                                    : 'bg-gray-100 dark:bg-slate-800/50 opacity-70 cursor-not-allowed border border-gray-200 dark:border-slate-700'
+                                            onClick={() => {
+                                                if (isUnlocked) {
+                                                    setSelectedPDF(pdf);
+                                                    markAsViewed(pdf.day);
+                                                }
+                                            }}
+                                            disabled={!isUnlocked}
+                                            className={`flex flex-col items-center p-3 rounded-xl transition-all duration-200 group ${
+                                                isUnlocked 
+                                                    ? 'bg-gray-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:scale-105 cursor-pointer' 
+                                                    : 'bg-gray-100 dark:bg-slate-800/50 opacity-60 cursor-not-allowed'
                                             }`}
                                         >
-                                            {/* Badges */}
-                                            {!isActuallyUnlocked && pdf.day > 12 && !isPremium && (
-                                                <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md z-10">
-                                                    <i className="fas fa-crown mr-1 text-[8px]"></i>PREMIUM
-                                                </div>
-                                            )}
-                                            {isActuallyUnlocked && !canOpenToday && (
-                                                <div className="absolute -top-2 -right-2 bg-gray-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md z-10">
-                                                    <i className="fas fa-hourglass-half mr-1"></i>LIMIT
-                                                </div>
-                                            )}
-                                            
-                                            <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-3 transition-all duration-200 ${
-                                                isActuallyUnlocked 
+                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-2 transition-colors ${
+                                                isUnlocked 
                                                     ? isViewed 
-                                                        ? 'bg-green-100 dark:bg-green-900/40 group-hover:bg-green-200' 
-                                                        : 'bg-red-100 dark:bg-red-900/40 group-hover:bg-red-200'
+                                                        ? 'bg-green-100 dark:bg-green-900/30' 
+                                                        : 'bg-red-100 dark:bg-red-900/30 group-hover:bg-red-200'
                                                     : 'bg-gray-200 dark:bg-slate-700'
                                             }`}>
-                                                {isActuallyUnlocked ? (
+                                                {isUnlocked ? (
                                                     isViewed ? (
                                                         <i className="fas fa-check-circle text-green-500 text-2xl"></i>
                                                     ) : (
@@ -3556,168 +3432,82 @@ const CertificateDownloadSection = () => (
                                                     <i className="fas fa-lock text-gray-400 text-xl"></i>
                                                 )}
                                             </div>
-                                            <span className={`text-sm font-semibold text-center ${
-                                                isActuallyUnlocked ? 'text-gray-800 dark:text-gray-200' : 'text-gray-500 dark:text-gray-500'
+                                            <span className={`text-xs font-medium text-center ${
+                                                isUnlocked ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-500'
                                             }`}>
                                                 Day {pdf.day}
                                             </span>
-                                            <span className={`text-[11px] text-center mt-1 ${
-                                                isActuallyUnlocked ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-600'
+                                            <span className={`text-[10px] truncate max-w-full ${
+                                                isUnlocked ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'
                                             }`}>
-                                                {isActuallyUnlocked ? (isViewed ? '✓ Completed' : '📖 Open') : (pdf.day > 12 && !isPremium ? '🔒 Premium' : '🔒 Locked')}
+                                                {isUnlocked ? (isViewed ? '✓ Viewed' : 'Click to open') : `🔒 Day ${pdf.day}`}
                                             </span>
                                         </button>
                                     );
                                 })}
                             </div>
                             
-                            {/* Progress Bar */}
-                            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-slate-700">
+                            {/* Progress Bar for PDF Unlocks */}
+                            <div className="mt-4 pt-3 border-t dark:border-slate-700">
                                 <div className="flex justify-between text-xs text-gray-500 mb-1">
-                                    <span>Your PDF Progress</span>
-                                    <span>{maxUnlockedDay}/{DATA.dailyPracticePDFs.length} Unlocked</span>
+                                    <span>Daily Practice Progress</span>
+                                    <span>{maxUnlockedDay}/{DATA.dailyPracticePDFs.length} PDFs Unlocked</span>
                                 </div>
-                                <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                                <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
                                     <div 
-                                        className="bg-gradient-to-r from-green-500 to-blue-500 h-2.5 rounded-full transition-all duration-700 ease-out"
+                                        className="bg-gradient-to-r from-green-500 to-blue-500 h-2 rounded-full transition-all duration-500"
                                         style={{ width: `${(maxUnlockedDay / DATA.dailyPracticePDFs.length) * 100}%` }}
                                     ></div>
                                 </div>
-                                {!isPremium && maxUnlockedDay < DATA.dailyPracticePDFs.length && (
-                                    <button 
-                                        onClick={() => setActiveSection('resources')}
-                                        className="mt-4 w-full py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all duration-300 flex items-center justify-center gap-2"
-                                    >
-                                        <i className="fas fa-crown"></i> Upgrade to Premium & Unlock All PDFs
-                                    </button>
-                                )}
-                                {isPremium && maxUnlockedDay === DATA.dailyPracticePDFs.length && (
-                                    <p className="text-xs text-center text-green-600 dark:text-green-400 mt-3 animate-pulse">
-                                        🎉 Congratulations! You have unlocked every practice PDF. 🎉
-                                    </p>
-                                )}
+                                <p className="text-xs text-center text-gray-400 mt-2">
+                                    <i className="fas fa-clock mr-1"></i>
+                                    {maxUnlockedDay < DATA.dailyPracticePDFs.length 
+                                        ? `Come back tomorrow for Day ${maxUnlockedDay + 1}!` 
+                                        : "🎉 Amazing! You've unlocked all PDFs!"}
+                                </p>
                             </div>
                         </div>
                         
-                        {/* Quick Links & Activity */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-white dark:bg-slate-900/90 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 transition-all duration-300 hover:shadow-2xl">
-                                <div className="flex items-center gap-2 mb-5">
-                                    <i className="fas fa-bolt text-indigo-500 text-xl"></i>
-                                    <h2 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">Quick Links</h2>
-                                </div>
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl animate-slideInUp card-hover" style={{animationDelay: '100ms'}}>
+                                <h2 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-4">Quick Links</h2>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <button onClick={() => setActiveSection('competition')} className="flex flex-col items-center justify-center p-5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-800 dark:to-slate-800/70 rounded-xl hover:shadow-lg transition-all duration-300 group hover:-translate-y-1">
-                                        <i className="fas fa-trophy text-3xl text-indigo-500 mb-2 group-hover:scale-110 transition-transform"></i>
-                                        <span className="font-semibold text-sm">Competition</span>
+                                    <button onClick={() => setActiveSection('competition')} className="flex flex-col items-center justify-center p-4 bg-gray-100 dark:bg-slate-800 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors">
+                                        <i className="fas fa-trophy text-3xl text-indigo-500 mb-2"></i>
+                                        <span className="font-semibold text-sm text-center">Competition</span>
                                     </button>
-                                    <button onClick={() => setActiveSection('resources')} className="flex flex-col items-center justify-center p-5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-800 dark:to-slate-800/70 rounded-xl hover:shadow-lg transition-all duration-300 group hover:-translate-y-1">
-                                        <i className="fas fa-book-open text-3xl text-green-500 mb-2 group-hover:scale-110 transition-transform"></i>
-                                        <span className="font-semibold text-sm">Resources</span>
+                                    <button onClick={() => setActiveSection('resources')} className="flex flex-col items-center justify-center p-4 bg-gray-100 dark:bg-slate-800 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors">
+                                        <i className="fas fa-book-open text-3xl text-green-500 mb-2"></i>
+                                        <span className="font-semibold text-sm text-center">Resources</span>
                                     </button>
                                 </div>
                             </div>
-                            <div className="bg-white dark:bg-slate-900/90 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 transition-all duration-300 hover:shadow-2xl">
-                                <div className="flex items-center gap-2 mb-5">
-                                    <i className="fas fa-history text-purple-500 text-xl"></i>
-                                    <h2 className="text-xl font-bold text-purple-600 dark:text-purple-400">Recent Activity</h2>
-                                </div>
-                                {activityLog && activityLog.length > 0 ? (
-                                    <ul className="space-y-3 max-h-40 overflow-y-auto">
-                                        {activityLog.slice(0, 4).map((activity, index) => (
-                                            <li key={index} className="flex items-center text-sm animate-fadeIn p-2 rounded-lg bg-gray-50 dark:bg-slate-800/50">
-                                                <i className="fas fa-circle text-[6px] text-purple-400 mr-3"></i>
-                                                <span className="text-gray-600 dark:text-gray-400">{activity}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <p className="text-gray-500 text-sm text-center py-6">No recent activity yet. Complete a quiz to get started!</p>
-                                )}
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl animate-slideInUp card-hover" style={{animationDelay: '200ms'}}>
+                                <h2 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-4">Recent Activity</h2>
+                                {activityLog && activityLog.length > 0 ? (<ul className="space-y-3">{activityLog.slice(0, 3).map((activity, index) => (<li key={index} className="flex items-center text-sm animate-fadeIn" style={{animationDelay: `${index * 100}ms`}}><i className="fas fa-history text-gray-400 mr-3"></i><span className="text-gray-600 dark:text-gray-400">{activity}</span></li>))}</ul>) : <p className="text-gray-500 text-sm">No recent activity yet. Complete a quiz to get started!</p>}
                             </div>
                         </div>
                     </div>
                     
-                    {/* Sidebar Progress Card */}
-                    <div className="bg-gradient-to-br from-white to-gray-50 dark:from-slate-900 dark:to-slate-800 p-6 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 transition-all duration-300 hover:shadow-2xl flex flex-col">
-                        <div className="text-center mb-4">
-                            <div className="inline-block p-3 rounded-full bg-indigo-100 dark:bg-indigo-900/50 mb-3">
-                                <i className="fas fa-chart-line text-indigo-600 dark:text-indigo-400 text-2xl"></i>
-                            </div>
-                            <h2 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">Your Progress</h2>
-                        </div>
-                        <div className="flex items-center justify-center my-4">
-                            <CircularProgress percentage={xpProgressPercentage} />
-                        </div>
-                        <div className="space-y-5 mt-2">
-                            <div className="text-center">
-                                <p className="text-2xl font-bold text-gray-800 dark:text-white">Level {Math.floor(userStats.xp / DATA.XP_PER_LEVEL) + 1}</p>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">{DATA.XP_PER_LEVEL - xpInLevel} XP to next level</p>
-                                <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-1.5 mt-2">
-                                    <div className="bg-gradient-to-r from-green-400 to-green-600 h-1.5 rounded-full" style={{ width: `${xpProgressPercentage}%` }}></div>
-                                </div>
-                            </div>
-                            <div className="text-center pt-3 border-t border-gray-200 dark:border-slate-700">
-                                <div className="flex items-center justify-center gap-2 text-orange-500">
-                                    <i className="fas fa-fire-alt text-2xl"></i>
-                                    <p className="text-3xl font-extrabold">{userStats.streak}</p>
-                                    <span className="text-sm font-bold">Day Streak 🔥</span>
-                                </div>
-                            </div>
-                            <div className="text-center pt-3 border-t border-gray-200 dark:border-slate-700">
-                                <div className="flex justify-between items-center text-sm">
-                                    <span className="text-gray-600 dark:text-gray-400"><i className="fas fa-file-pdf text-red-400 mr-1"></i> PDFs Unlocked:</span>
-                                    <span className="font-bold text-blue-600 dark:text-blue-400">{maxUnlockedDay}/{DATA.dailyPracticePDFs.length}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm mt-2">
-                                    <span className="text-gray-600 dark:text-gray-400"><i className="fas fa-eye text-green-400 mr-1"></i> PDFs Viewed:</span>
-                                    <span className="font-bold text-green-600 dark:text-green-400">{Object.keys(viewedPDFs).length}</span>
-                                </div>
-                                <div className="flex justify-between items-center text-sm mt-2">
-                                    <span className="text-gray-600 dark:text-gray-400"><i className="fas fa-check-circle text-indigo-400 mr-1"></i> Quizzes Done:</span>
-                                    <span className="font-bold text-indigo-600 dark:text-indigo-400">{completedCount}/{DATA.dailyQuizzes.length}</span>
-                                </div>
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl animate-slideInUp card-hover flex flex-col" style={{animationDelay: '300ms'}}>
+                        <h2 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-4">Your Progress</h2>
+                        <div className="flex items-center justify-center my-4"><CircularProgress percentage={xpProgressPercentage} /></div>
+                        <div className="space-y-4 mt-auto">
+                            <div><p className="font-semibold">Level {Math.floor(userStats.xp / DATA.XP_PER_LEVEL) + 1}</p><p className="text-sm text-gray-500 dark:text-gray-400">{DATA.XP_PER_LEVEL - xpInLevel} XP to next level</p></div>
+                            <div><p className="font-semibold">Current Streak</p><p className="text-3xl font-extrabold text-orange-500">{userStats.streak} <span className="text-lg font-bold">Days 🔥</span></p></div>
+                            <div className="pt-4 border-t dark:border-slate-700">
+                                <p className="font-semibold text-sm flex items-center gap-2">
+                                    <i className="fas fa-file-pdf text-red-400"></i>
+                                    PDFs Unlocked: {maxUnlockedDay}/{DATA.dailyPracticePDFs.length}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    {Object.keys(viewedPDFs).length} PDFs viewed so far
+                                </p>
                             </div>
                         </div>
-                        {!isPremium && (
-                            <div className="mt-6 pt-4 text-center">
-                                <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 p-3 rounded-xl border border-amber-200 dark:border-amber-800">
-                                    <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">
-                                        <i className="fas fa-gem mr-1"></i> Upgrade to Premium to unlock all PDFs (Days 13–25) and get exclusive resources.
-                                    </p>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>
-            
-            {/* Floating tooltip for limit */}
-            {showLimitTooltip && (
-                <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl z-50 animate-bounce text-sm font-medium flex items-center gap-2 backdrop-blur-md bg-opacity-90">
-                    <i className="fas fa-info-circle text-blue-400"></i> {tooltipMessage}
-                </div>
-            )}
-            
-            <style>{`
-                .custom-scrollbar::-webkit-scrollbar {
-                    width: 6px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-track {
-                    background: #e2e8f0;
-                    border-radius: 10px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: #94a3b8;
-                    border-radius: 10px;
-                }
-                .dark .custom-scrollbar::-webkit-scrollbar-track {
-                    background: #1e293b;
-                }
-                .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: #475569;
-                }
-            `}</style>
         </section>
     );
 };
