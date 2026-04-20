@@ -85,7 +85,7 @@
     whatsAppContactNumber: "9826594548",
         whatsAppGroupLink: "https://chat.whatsapp.com/CqEGZWcGSMr75m8FzV6Wyu", // Add your WhatsApp group link here
         premiumInfoVideoLink: 'https://youtu.be/TOuwhX1wcYk?t=289', // Placeholder link
-        premiumPrice: 249,
+        premiumPrice: 199,
         esewaId: "9828547734",
         XP_PER_QUIZ: 10,
         XP_PER_LEVEL: 100,
@@ -2208,7 +2208,7 @@ const PaymentModal = ({ onPaymentSuccess, onClose, userName }) => {
     const getPrice = () => { 
         const now = new Date(); 
         const endDate = new Date(2026, 3, 20); 
-        return now <= endDate ? 130 : 249; 
+        return now <= endDate ? 130 : 199; 
     }; 
     
     const premiumPrice = getPrice(); 
@@ -2306,7 +2306,7 @@ const PaymentModal = ({ onPaymentSuccess, onClose, userName }) => {
                             <div className={`rounded-2xl p-5 border-2 relative overflow-hidden ${isOfferValid ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-amber-500/60' : 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 border-emerald-500/60'}`}> 
                                 {isOfferValid && <div className="absolute -top-2 -right-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs px-3 py-1 rounded-bl-2xl rounded-tr-2xl font-bold">🔥 LIMITED OFFER</div>} 
                                 <div className="text-center"> 
-                                    {isOfferValid && <p className="text-white/50 text-sm line-through mb-1">Regular Rs. 249</p>} 
+                                    {isOfferValid && <p className="text-white/50 text-sm line-through mb-1">Regular Rs. 199</p>} 
                                     <div className="flex items-baseline justify-center gap-2 mb-2"> 
                                         <span className={`text-6xl font-black ${isOfferValid ? 'text-amber-400' : 'text-emerald-400'}`}>Rs. {premiumPrice}</span> 
                                         <span className="text-white/60 text-sm">/ lifetime</span> 
